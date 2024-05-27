@@ -1,8 +1,10 @@
 from math import pi, sin, cos
 from machine import Pin, PWM
-from time import sleep
+from time import sleep, time
 import ubinascii
 from umqtt.simple import MQTTClient
+from machine import WDT
+
 
 MQTT_SERVER = "10.1.1.2"
 MQTT_PORT = 1883
@@ -47,6 +49,8 @@ def loop(pwm_led0, pwm_led1):
 
 def callback(topic, msg):
     global state, index, inc
+
+    print(topic, msg)
         
     try:
         b = int(msg)
@@ -72,10 +76,21 @@ def main():
     c.subscribe("blacklight-art/set")
     print("Connected, subscribed")
 
+    wdt = WDT()
+
+    next_ping_time = time() + 500
+
     try:
         while 1:
             c.check_msg()
             loop(pwm_led0, pwm_led1)
+
+            if time() > next_ping_time:
+                next_ping_time = time() + 500
+                c.ping()
+
+            wdt.feed()
+
     finally:
         c.disconnect()
 
