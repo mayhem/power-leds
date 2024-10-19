@@ -1,3 +1,3 @@
 #!/bin/bash
 
-rshell -p /dev/ttyUSB0 -b 115200
+rshell -p /dev/ttyACM0 -b 115200
