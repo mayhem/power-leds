@@ -16,15 +16,15 @@ last_message = 0
 message_interval = 5
 counter = 0
 
-station = network.WLAN(network.STA_IF)
+#station = network.WLAN(network.STA_IF)
 
-station.active(True)
-station.connect(ssid, password)
+#station.active(True)
+#station.connect(ssid, password)
 
-print("Connecting to Wifi...")
+#print("Connecting to Wifi...")
 
-while station.isconnected() == False:
-  pass
+#while station.isconnected() == False:
+#  pass
 
-print('Connection successful')
-print(station.ifconfig())
+#print('Connection successful')
+#print(station.ifconfig())
