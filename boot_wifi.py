@@ -1,30 +1,16 @@
-import time
-from umqttsimple import MQTTClient
-import ubinascii
-import machine
-import micropython
 import network
-import esp
-esp.osdebug(None)
 import gc
+
 gc.collect()
 
-ssid = 'Hippo Oasis'
-password = 'chillwithhippos'
+SSID = 'Hippo Oasis'
+PASSWORD = 'chillwithhippos'
 
-last_message = 0
-message_interval = 5
-counter = 0
-
-station = network.WLAN(network.STA_IF)
-
-station.active(True)
-station.connect(ssid, password)
-
-print("Connecting to Wifi...")
-
-while station.isconnected() == False:
-  pass
-
-print('Connection successful')
-print(station.ifconfig())
+wlan = network.WLAN(network.STA_IF)
+wlan.active(True)
+if not wlan.isconnected():
+    print('connecting to network...')
+    wlan.connect(SSID, PASSWORD)
+    while not wlan.isconnected():
+        pass
+print('network config:', wlan.ipconfig('addr4'))
