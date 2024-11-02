@@ -1,5 +1,4 @@
 from math import fabs, fmod
-import traceback
 
 class Gradient(object):
     def __init__(self, palette, leds=1):

@@ -3,6 +3,8 @@ from neopixel import NeoPixel
 from time import sleep
 from math import fmod
 
+from gradient import Gradient
+
 NUM_LEDS = 144
 NUM_COLS = 28
 NUM_ROWS = 5
@@ -123,35 +125,51 @@ class TurkishLamp:
 
             hue_offset += .1
 
-    def sleepy_hippos_and_damsels(self):
-        step = 1 / NUM_COLS
-        hue_offset = 0.0
 
+    def sleepy_hippos_and_damsels(self):
+
+        g = Gradient([ (0.00, (247, 25, 125)),
+                       (0.25, (255, 136, 0)),
+                       (0.50, (247, 25, 125)),
+                       (0.75, (255, 136, 0)),
+                       (1.0, (247, 25, 125)) ])
         leds = [ [0,0,0] for n in range(NUM_LEDS) ]
+
+        # How far we should step for each pixel
+        led_step = 1.0 / NUM_COLS 
+
+        # The total gradient shift offset, could be > 1.0!
+        shift_offset = 0.0
         while not self.stop:
-            hue = fmod(hue_offset, 1.0)
+            offset = fmod(shift_offset, 1.0)
             for col in range(NUM_COLS):
-                for row in range(NUM_ROWS):
-                    led = self.led_from_row_col(row, col)
-                    r,g,b = self.hsv_to_rgb(int(fmod(hue, 1.0) * 255), 255, 255)
-                    leds[led] = (r,g,b)
-                    self.set_leds(leds)
-                    sleep(.01)
-                hue += step
+                color0 = g.get_color(fmod(col * led_step + offset, 1.0))
+                led = self.led_from_row_col(0, col)
+                leds[led] = color0
+                led = self.led_from_row_col(1, col)
+                leds[led] = color0
+
+                color1 = g.get_color(fmod(col * led_step + (1.0 - offset), 1.0))
+                led = self.led_from_row_col(3, col)
+                leds[led] = color1
+                led = self.led_from_row_col(4, col)
+                leds[led] = color1
+
+                led = self.led_from_row_col(2, col)
+                if col % 2 == 0:
+                    leds[led] = color0
+                else:
+                    leds[led] = color1
 
                 if self.stop:
                     break
 
-            for col in range(NUM_COLS):
-                for row in range(NUM_ROWS):
-                    led = self.led_from_row_col(row, col)
-                    leds[led] = (0,0,0)
-                    self.set_leds(leds)
-                    sleep(.01)
-
-            hue_offset += .1
+            self.set_leds(leds)
+            sleep(.05)
+            shift_offset += .02
 
 
 tl = TurkishLamp()
-tl.rainbow_sweep()
+#tl.rainbow_sweep()
+tl.sleepy_hippos_and_damsels()
 
