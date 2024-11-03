@@ -68,7 +68,7 @@ while True:
 
     for hue in range(255):
         rgb = hsv_to_rgb(hue, 255, 255)
-        rgb = [ x // 4 for x in rgb ]
+        rgb = [ x // 6 for x in rgb ]
 
         for j in range(NUM_LEDS):
             np[j] = rgb

@@ -1,5 +1,7 @@
+import network
 from machine import Pin, unique_id
 from neopixel import NeoPixel
+import json
 from time import sleep, time
 from math import fmod
 from umqttsimple import MQTTClient
@@ -8,23 +10,33 @@ import ubinascii
 from gradient import Gradient
 from colorsys import hsv_to_rgb
 
+SSID = 'Hippo Oasis'
+PASSWORD = 'chillwithhippos'
+
 MAX_BRIGHTNESS = 20
 NUM_LEDS = 144
 NUM_COLS = 28
 NUM_ROWS = 5
 ROWS = [ 0, 28, 57, 85, 113, 141 ]
 
+USE_NETWORK = True
 MQTT_SERVER = "10.1.1.2"
 MQTT_PORT = 1883
 CLIENT_ID = ubinascii.hexlify(unique_id())
 
 class Pattern:
 
+    def __init__(self):
+        self.name = None
+
     def run(turkish_lamp):
         pass
 
 
 class PatternRainbowSweep:
+
+    def __init__(self):
+        self.name = "daytime"
 
     def run(self, lamp):
         step = 1 / NUM_COLS
@@ -40,6 +52,7 @@ class PatternRainbowSweep:
                     leds[led] = (r,g,b)
                     lamp.set_leds(leds)
                     if lamp.should_exit():
+                        lamp.set_all()
                         return
                     sleep(.01)
                 hue += step
@@ -50,13 +63,19 @@ class PatternRainbowSweep:
                     leds[led] = (0,0,0)
                     lamp.set_leds(leds)
                     if lamp.should_exit():
+                        lamp.set_all()
                         return
                     sleep(.01)
 
             hue_offset += .1
 
 
+
+
 class PatternHipposAndDamsels:
+
+    def __init__(self):
+        self.name = "nighttime"
 
     def run(self, lamp):
         g = Gradient([ (0.00, (247, 25, 125)),
@@ -94,9 +113,13 @@ class PatternHipposAndDamsels:
 
             lamp.set_leds(leds)
             if lamp.should_exit():
-                return
+                break
+
             sleep(.05)
             shift_offset += .02
+
+        # turn off the leds
+        lamp.set_all()
 
 turkish_light = None
 def callback(topic, msg):
@@ -109,16 +132,51 @@ class TurkishLamp:
     def __init__(self):
         pin = Pin(1, Pin.OUT)
         self.np = NeoPixel(pin, NUM_LEDS)
+        self.brightness = 100
+        self.state = False
         self.stop = False
-        self.brightness = 20
+        self.effect = None
+        self.current_pattern = None
+        self.next_pattern_args = None
 
-        self.c = MQTTClient(CLIENT_ID, MQTT_SERVER, MQTT_PORT)
-        self.c.set_callback(callback)
-        self.c.connect()
-        self.c.subscribe("turkish-light/set")
-        print("Connected, subscribed, yo")
-        self.next_ping_time = None
+        self.startup()
+        self.connect_wifi()
+
+        if USE_NETWORK:
+            self.c = MQTTClient(CLIENT_ID, MQTT_SERVER, MQTT_PORT)
+            self.c.set_callback(callback)
+            self.c.connect()
+            self.c.subscribe("turkish-light/set")
+            self.c.publish("turkish-light/hello", "hi!")
+            print("Connected, subscribed, yo")
+            self.next_ping_time = None
+        else:
+            self.c = None
+
         #self.wdt = WDT()
+
+        print("Start lamp!")
+        self.set_all()
+
+    def startup(self):
+        for i in range(5):
+            self.set_all((32, 0, 0))
+            sleep(.5)
+            self.set_all()
+            sleep(.5)
+
+    def connect_wifi(self):
+        wlan = network.WLAN(network.STA_IF)
+        wlan.active(True)
+        if not wlan.isconnected():
+            print("Disconnect, starting over clean.")
+            wlan.disconnect()
+
+        print('connecting to network...')
+        wlan.connect(SSID, PASSWORD)
+        while not wlan.isconnected():
+            pass
+        print('network config:', wlan.ipconfig('addr4'))
 
     def set_brightness(self, b):
         self.brightness = b
@@ -137,41 +195,86 @@ class TurkishLamp:
 
     def set_leds(self, leds):
         for i, led in enumerate(leds):
-            self.np[i] = [ int((led[0] * self.brightness) / 100),
-                           int((led[1] * self.brightness) / 100),
-                           int((led[2] * self.brightness) / 100) ]
+            self.np[i] = [ int((led[0] * self.brightness * MAX_BRIGHTNESS) / 10000),
+                           int((led[1] * self.brightness * MAX_BRIGHTNESS) / 10000),
+                           int((led[2] * self.brightness * MAX_BRIGHTNESS) / 10000) ]
         self.np.write()
 
+    def set_all(self, color=(0,0,0)):
+        self.set_leds([ color for n in range(NUM_LEDS) ])
+
     def run(self):
+
+        print("Run...")
         self.next_ping_time = time() + 500
 
-        patterns = [ PatternRainbowSweep, PatternHipposAndDamsels ]
-        pattern = patterns[1]()
-        pattern.run(self)
+        self.patterns = { "daytime": PatternRainbowSweep, 
+                          "bedtime": PatternHipposAndDamsels }
+        while True:
+
+            if self.current_pattern:
+                self.current_pattern.run(self)
+            else:
+                # Loop until we're told to exit, which means something is about to happen
+                while not self.should_exit():
+                    sleep(.01)
+
+            # reset the stop flag
+            self.stop = False
+
+            if self.next_pattern_args is None:
+                continue
+
+            # Shall we turn on?
+            if not self.state and self.next_pattern_args["state"]:
+                self.current_pattern = self.patterns[self.next_pattern_args["effect"]]()
+                self.brightness = self.next_pattern_args["brightness"]
+                self.state = True
+            elif self.state and not self.next_pattern_args["state"]:
+                self.current_pattern = None
+                self.state = False
+            elif self.state and self.next_pattern_args["state"] and \
+                self.current_pattern.name != self.next_pattern_args["effect"]:
+                self.current_pattern = self.patterns[self.next_pattern_args["effect"]]()
+                self.brightness = self.next_pattern_args["brightness"]
+
+            self.next_pattern_args = None
 
 
     def should_exit(self):
 
-        self.c.check_msg()
-        if time() > self.next_ping_time:
-            self.next_ping_time = time() + 500
-            self.c.ping()
+        if self.c is not None:
+            self.c.check_msg()
+            if time() > self.next_ping_time:
+                self.next_ping_time = time() + 500
+                self.c.ping()
 
         #self.wdt.feed()
+
+        return self.stop
 
 
     def callback(self, topic, msg):
         print(topic, msg)
+
+        args = json.loads(msg)
         try:
-            b = int(msg)
-        except ValueError:
+            if args["brightness"] < 0 or args["brightness"] > 100:
+                return
+            effect = args["effect"]
+            state = args["state"]
+        except KeyError:
             return
 
-        if b < 0 or b > MAX_BRIGHTNESS:
+        if effect not in self.patterns:
             return
 
-        self.brightness = b
+        if args["state"] and self.state and args["effect"] == self.current_pattern.name:
+            self.brightness = args["brightness"]
+            return
 
+        self.stop = True
+        self.next_pattern_args = args
 
 turkish_light = TurkishLamp()
 turkish_light.run()
