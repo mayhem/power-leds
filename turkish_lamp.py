@@ -13,11 +13,10 @@ from colorsys import hsv_to_rgb
 SSID = 'Hippo Oasis'
 PASSWORD = 'chillwithhippos'
 
-MAX_BRIGHTNESS = 20
+MAX_BRIGHTNESS = 50
 NUM_LEDS = 144
 NUM_COLS = 28
 NUM_ROWS = 5
-ROWS = [ 0, 28, 57, 85, 113, 141 ]
 
 USE_NETWORK = True
 MQTT_SERVER = "10.1.1.2"
@@ -48,31 +47,39 @@ class PatternRainbowSweep:
             for col in range(NUM_COLS):
                 for row in range(NUM_ROWS):
                     led = lamp.led_from_row_col(row, col)
-                    if led is None:
-                        continue
                     r,g,b = hsv_to_rgb(int(fmod(hue, 1.0) * 255), 255, 255)
                     leds[led] = (r,g,b)
                     lamp.set_leds(leds)
-                    if lamp.should_exit():
-                        lamp.set_all()
-                        return
-                    sleep(.01)
+                if lamp.should_exit():
+                    lamp.set_all()
+                    return
+                sleep(.01)
                 hue += step
 
             for col in range(NUM_COLS):
                 for row in range(NUM_ROWS):
                     led = lamp.led_from_row_col(row, col)
-                    if led is None:
-                        continue
                     leds[led] = (0,0,0)
                     lamp.set_leds(leds)
-                    if lamp.should_exit():
-                        lamp.set_all()
-                        return
-                    sleep(.01)
+                if lamp.should_exit():
+                    lamp.set_all()
+                    return
+                sleep(.01)
 
             hue_offset += .1
 
+    def runs(self, lamp):
+        leds = [ [0,0,0] for n in range(NUM_LEDS) ]
+        for i in range(1000000000):
+            for row in range(NUM_ROWS):
+                for col in range(NUM_COLS):
+                    led = lamp.led_from_row_col(row, col)
+                    if i % 2 == 0:
+                        leds[led] = (255, 0, 0)
+                    else:
+                        leds[led] = (0, 0, 0)
+                    lamp.set_leds(leds)
+                    sleep(.01)
 
 
 
@@ -97,21 +104,19 @@ class PatternHipposAndDamsels:
         while True:
             offset = fmod(shift_offset, 1.0)
             for col in range(NUM_COLS):
-                color0 = g.get_color(fmod(col * led_step + offset, 1.0))
+                offset0 = fmod(col * led_step + offset, 1.0)
+                color0 = g.get_color(offset0)
                 led = lamp.led_from_row_col(0, col)
-                if led is not None:
-                    leds[led] = color0
+                leds[led] = color0
                 led = lamp.led_from_row_col(1, col)
-                if led is not None:
-                    leds[led] = color0
+                leds[led] = color0
 
-                color1 = g.get_color(fmod(col * led_step + (1.0 - offset), 1.0))
+                offset1 = fmod(col * led_step + (1.0 - offset), 1.0)
+                color1 = g.get_color(offset1)
                 led = lamp.led_from_row_col(3, col)
-                if led is not None:
-                    leds[led] = color1
+                leds[led] = color1
                 led = lamp.led_from_row_col(4, col)
-                if led is not None:
-                    leds[led] = color1
+                leds[led] = color1
 
                 led = lamp.led_from_row_col(2, col)
                 if led is not None:
@@ -130,6 +135,7 @@ class PatternHipposAndDamsels:
         # turn off the leds
         lamp.set_all()
 
+
 turkish_light = None
 def callback(topic, msg):
     global turkish_light
@@ -139,7 +145,7 @@ class TurkishLamp:
 
 
     def __init__(self):
-        pin = Pin(1, Pin.OUT)
+        pin = Pin(26, Pin.OUT)
         self.np = NeoPixel(pin, NUM_LEDS)
         self.brightness = 100
         self.state = False
@@ -168,11 +174,16 @@ class TurkishLamp:
         self.set_all()
 
     def startup(self):
-        for i in range(5):
-            self.set_all((32, 0, 0))
+        for i in range(3):
+            for i in range(50):
+                self.np[i] = ((214, 95, 4))
+            self.np.write()
             sleep(.5)
-            self.set_all()
+            for i in range(50):
+                self.np[i] = ((83, 4, 186))
+            self.np.write()
             sleep(.5)
+        self.set_all((0, 0, 128))
 
     def connect_wifi(self):
         wlan = network.WLAN(network.STA_IF)
@@ -191,22 +202,15 @@ class TurkishLamp:
         self.brightness = b
 
     def led_from_row_col(self, row, col):
-        if row >= len(ROWS):
-            return
-
-        start = ROWS[row]
-        end = ROWS[row + 1]
-
-        if col >= end - start:
-            return None
-
-        return start + col
+        assert row < NUM_ROWS
+        assert col < NUM_COLS
+        return (row * NUM_COLS) + col
 
     def set_leds(self, leds):
         for i, led in enumerate(leds):
             self.np[i] = [ int((led[0] * self.brightness * MAX_BRIGHTNESS) / 10000),
-                           int((led[1] * self.brightness * MAX_BRIGHTNESS) / 10000),
-                           int((led[2] * self.brightness * MAX_BRIGHTNESS) / 10000) ]
+                          int((led[1] * self.brightness * MAX_BRIGHTNESS) / 10000),
+                          int((led[2] * self.brightness * MAX_BRIGHTNESS) / 10000) ]
         self.np.write()
 
     def set_all(self, color=(0,0,0)):
@@ -214,7 +218,6 @@ class TurkishLamp:
 
     def run(self):
 
-        print("Run...")
         self.next_ping_time = time() + 500
 
         self.patterns = { "daytime": PatternRainbowSweep, 
@@ -264,7 +267,7 @@ class TurkishLamp:
 
 
     def callback(self, topic, msg):
-        print(topic, msg)
+        #print(topic, msg)
 
         args = json.loads(msg)
         try:
