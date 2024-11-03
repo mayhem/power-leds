@@ -48,6 +48,8 @@ class PatternRainbowSweep:
             for col in range(NUM_COLS):
                 for row in range(NUM_ROWS):
                     led = lamp.led_from_row_col(row, col)
+                    if led is None:
+                        continue
                     r,g,b = hsv_to_rgb(int(fmod(hue, 1.0) * 255), 255, 255)
                     leds[led] = (r,g,b)
                     lamp.set_leds(leds)
@@ -60,6 +62,8 @@ class PatternRainbowSweep:
             for col in range(NUM_COLS):
                 for row in range(NUM_ROWS):
                     led = lamp.led_from_row_col(row, col)
+                    if led is None:
+                        continue
                     leds[led] = (0,0,0)
                     lamp.set_leds(leds)
                     if lamp.should_exit():
@@ -95,21 +99,26 @@ class PatternHipposAndDamsels:
             for col in range(NUM_COLS):
                 color0 = g.get_color(fmod(col * led_step + offset, 1.0))
                 led = lamp.led_from_row_col(0, col)
-                leds[led] = color0
+                if led is not None:
+                    leds[led] = color0
                 led = lamp.led_from_row_col(1, col)
-                leds[led] = color0
+                if led is not None:
+                    leds[led] = color0
 
                 color1 = g.get_color(fmod(col * led_step + (1.0 - offset), 1.0))
                 led = lamp.led_from_row_col(3, col)
-                leds[led] = color1
+                if led is not None:
+                    leds[led] = color1
                 led = lamp.led_from_row_col(4, col)
-                leds[led] = color1
+                if led is not None:
+                    leds[led] = color1
 
                 led = lamp.led_from_row_col(2, col)
-                if col % 2 == 0:
-                    leds[led] = color0
-                else:
-                    leds[led] = color1
+                if led is not None:
+                    if col % 2 == 0:
+                        leds[led] = color0
+                    else:
+                        leds[led] = color1
 
             lamp.set_leds(leds)
             if lamp.should_exit():
