@@ -267,18 +267,20 @@ class TurkishLamp:
 
 
     def callback(self, topic, msg):
-        #print(topic, msg)
+        print(topic, msg)
 
         args = json.loads(msg)
         try:
-            if args["brightness"] < 0 or args["brightness"] > 100:
-                return
-            effect = args["effect"]
             state = args["state"]
         except KeyError:
             return
 
-        if effect not in self.patterns:
+        brightness = args.get("brightness", 0)
+        if brightness < 0 or brightness > 100:
+            return
+
+        effect = args.get("effect", "")
+        if args["state"] and effect not in self.patterns:
             return
 
         if args["state"] and self.state and args["effect"] == self.current_pattern.name:
