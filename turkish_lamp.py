@@ -118,12 +118,12 @@ class PatternHipposAndDamsels:
                 led = lamp.led_from_row_col(4, col)
                 leds[led] = color1
 
-                led = lamp.led_from_row_col(2, col)
-                if led is not None:
-                    if col % 2 == 0:
-                        leds[led] = color0
-                    else:
-                        leds[led] = color1
+#                led = lamp.led_from_row_col(2, col)
+#                if led is not None:
+#                    if col % 2 == 0:
+#                        leds[led] = color0
+#                    else:
+#                        leds[led] = color1
 
             lamp.set_leds(leds)
             if lamp.should_exit():
@@ -145,7 +145,7 @@ class TurkishLamp:
 
 
     def __init__(self):
-        pin = Pin(26, Pin.OUT)
+        pin = Pin(1, Pin.OUT)
         self.np = NeoPixel(pin, NUM_LEDS)
         self.brightness = 100
         self.state = False
@@ -196,7 +196,7 @@ class TurkishLamp:
         wlan.connect(SSID, PASSWORD)
         while not wlan.isconnected():
             pass
-        print('network config:', wlan.ipconfig('addr4'))
+#        print('network config:', wlan.ipconfig('addr4'))
 
     def set_brightness(self, b):
         self.brightness = b
