@@ -2,6 +2,7 @@ import network
 from machine import Pin, unique_id
 from neopixel import NeoPixel
 import json
+from random import random, randint
 from time import sleep, time
 from math import fmod
 from umqttsimple import MQTTClient
@@ -135,6 +136,43 @@ class PatternHipposAndDamsels:
         # turn off the leds
         lamp.set_all()
 
+class PatternHipposAndDamselsFade:
+
+    def __init__(self):
+        self.name = "nighttime"
+
+    def run(self, lamp):
+        g = Gradient([ (0.00, (247, 25, 125)),
+                       (0.25, (255, 136, 0)),
+                       (0.50, (247, 25, 125)),
+                       (0.75, (255, 136, 0)),
+                       (1.0, (247, 25, 125)) ])
+        leds = [ [0,0,0] for n in range(NUM_LEDS) ]
+
+        step = .005
+        index = 0.0
+        while True:
+            color = g.get_color(index)
+            for i in range(0, NUM_LEDS, 32):
+                leds[i] = color
+                
+            index += step
+            if index >= 1.0:
+                index = 1.0 - step
+                step = -step
+            elif index < 0.0:
+                step = -step
+                index = step
+
+            lamp.set_leds(leds)
+            if lamp.should_exit():
+                break
+
+            sleep(.025)
+
+        # turn off the leds
+        lamp.set_all()
+
 
 turkish_light = None
 def callback(topic, msg):
@@ -178,11 +216,11 @@ class TurkishLamp:
             for i in range(50):
                 self.np[i] = ((214, 95, 4))
             self.np.write()
-            sleep(.5)
+            sleep(.15)
             for i in range(50):
                 self.np[i] = ((83, 4, 186))
             self.np.write()
-            sleep(.5)
+            sleep(.15)
         self.set_all((0, 0, 128))
 
     def connect_wifi(self):
@@ -217,11 +255,13 @@ class TurkishLamp:
         self.set_leds([ color for n in range(NUM_LEDS) ])
 
     def run(self):
+#        p = PatternHipposAndDamselsFade()
+#        p.run(self)
 
         self.next_ping_time = time() + 500
 
         self.patterns = { "daytime": PatternRainbowSweep, 
-                          "bedtime": PatternHipposAndDamsels }
+                          "bedtime": PatternHipposAndDamselsFade }
         while True:
 
             if self.current_pattern:
@@ -267,8 +307,6 @@ class TurkishLamp:
 
 
     def callback(self, topic, msg):
-        print(topic, msg)
-
         args = json.loads(msg)
         try:
             state = args["state"]

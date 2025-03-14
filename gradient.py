@@ -57,7 +57,7 @@ class Gradient(object):
                         int(self.palette[index - 1][1][color] +
                             ((self.palette[index][1][color] - self.palette[index - 1][1][color]) * percent)))
 
-                return (max(min(new_color[0], 255), 0), max(min(new_color[1], 255), 0), max(min(new_color[2], 255), 0))
+                return [max(min(new_color[0], 255), 0), max(min(new_color[1], 255), 0), max(min(new_color[2], 255), 0)]
 
         self.print_palette()
         assert False
