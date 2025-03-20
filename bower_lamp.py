@@ -9,7 +9,7 @@ from umqttsimple import MQTTClient
 import ubinascii
 
 from gradient import Gradient
-from colorsys import hsv_to_rgb, rgb_to_hsv
+from _colorsys import c_hsv_to_rgb, c_rgb_to_hsv
 
 SSID = 'Hippo Oasis'
 PASSWORD = 'chillwithhippos'
@@ -220,16 +220,14 @@ class BowerLamp:
                 return
             if topic.endswith("color"):
                 if msg in ("up", "down"):
-                    h,s,v = rgb_to_hsv(self.solid_color)
+                    h,s,v = c_rgb_to_hsv(self.solid_color)
                     r,g, b = self.solid_color
-                    print(f"{r}, {g}, {b} -> {h}, {s}, {v}")
                     if msg == "up":
-                        h = max(255, h + HUE_STEP)
+                        h = min(255, h + HUE_STEP)
                     else:
-                        h = min(0, h - HUE_STEP)
-                    color = hsv_to_rgb((h,s,v))
+                        h = max(0, h - HUE_STEP)
+                    color = c_hsv_to_rgb((h,s,v))
                     r,g, b = color
-                    print(f"{h}, {s}, {v} -> {r}, {g}, {b}")
                 else:
                     color = msg.split("#", 1)[1]
                     color = self.hex_to_rgb(color)
@@ -237,7 +235,6 @@ class BowerLamp:
                         if color[0] < 0 or color[0] > 255:
                             return
                 
-                print("color", color)
                 self.next_pattern_args = { "color": color, "state": self.state }
                 self.stop = True
                 return
