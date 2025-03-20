@@ -19,7 +19,7 @@ NUM_LEDS = 144
 NUM_COLS = 28
 NUM_ROWS = 5
 
-USE_NETWORK = True
+USE_NETWORK = True 
 MQTT_SERVER = "10.1.1.2"
 MQTT_PORT = 1883
 CLIENT_ID = ubinascii.hexlify(unique_id())
@@ -153,8 +153,9 @@ class PatternHipposAndDamselsFade:
         index = 0.0
         while True:
             color = g.get_color(index)
-            for i in range(0, NUM_LEDS, 32):
-                leds[i] = color
+            for col in range(0, NUM_COLS, 2):
+                led = lamp.led_from_row_col(2, col)
+                leds[led] = color
                 
             index += step
             if index >= 1.0:
@@ -255,8 +256,9 @@ class TurkishLamp:
         self.set_leds([ color for n in range(NUM_LEDS) ])
 
     def run(self):
-#        p = PatternHipposAndDamselsFade()
-#        p.run(self)
+        if not USE_NETWORK:
+            p = PatternHipposAndDamselsFade()
+            p.run(self)
 
         self.next_ping_time = time() + 500
 
