@@ -67,7 +67,7 @@ class BowerLamp:
         self.effect = None
         self.current_pattern = None
         self.next_pattern_args = None
-        self.solid_color = (255, 0, 190)
+        self.solid_color = [255, 0, 190]
 
         self.startup()
         self.connect_wifi()
@@ -152,6 +152,7 @@ class BowerLamp:
 
             # Shall we turn on?
             if not self.state and self.next_pattern_args["state"]:
+                print("turn on")
                 self.current_pattern = self.patterns[self.next_pattern_args["effect"]]()
                 self.brightness = self.next_pattern_args["brightness"]
                 if "color" in self.next_pattern_args:
@@ -159,6 +160,7 @@ class BowerLamp:
                 self.state = True
             # Turn off?
             elif self.state and not self.next_pattern_args["state"]:
+                print("turn off")
                 self.current_pattern = None
                 self.state = False
                 self.set_all()
@@ -166,12 +168,14 @@ class BowerLamp:
             elif self.state and "effect" in self.next_pattern_args and \
                 self.next_pattern_args["state"] and \
                 self.current_pattern.name != self.next_pattern_args["effect"]:
+                print("next patt")
 
                 self.current_pattern = self.patterns[self.next_pattern_args["effect"]]()
                 self.brightness = self.next_pattern_args["brightness"]
                 self.solid_color = self.next_pattern_args["color"]
             # Keep pattern, update params
             else:
+                print("adj", self.next_pattern_args)
                 if "brightness" in self.next_pattern_args:
                     self.brightness = self.next_pattern_args["brightness"]
                 if "color" in self.next_pattern_args:
@@ -199,9 +203,13 @@ class BowerLamp:
         return rgb
 
     def callback(self, topic, msg):
-        try:
-            args = json.loads(msg)
-        except ValueError:
+        print(topic, msg)
+        if msg[0] == "{":
+            try:
+                args = json.loads(msg)
+            except ValueError:
+                return
+        else:
             if topic.endswith("brightness"):
                 step = 5 if self.brightness > 10 else 1
                 if msg == "up":
@@ -215,27 +223,24 @@ class BowerLamp:
                             return
                     except ValueError:
                         return
-                self.next_pattern_args = { "brightness": brightness, "state": self.state }
+                self.next_pattern_args = { "brightness": brightness, "state": True }
                 self.stop = True
                 return
             if topic.endswith("color"):
                 if msg in ("up", "down"):
                     h,s,v = c_rgb_to_hsv(self.solid_color)
-                    r,g, b = self.solid_color
                     if msg == "up":
                         h = min(255, h + HUE_STEP)
                     else:
                         h = max(0, h - HUE_STEP)
                     color = c_hsv_to_rgb((h,s,v))
-                    r,g, b = color
                 else:
-                    color = msg.split("#", 1)[1]
-                    color = self.hex_to_rgb(color)
+                    color = self.hex_to_rgb(msg[1:])
                     for i in range(3):
                         if color[0] < 0 or color[0] > 255:
                             return
                 
-                self.next_pattern_args = { "color": color, "state": self.state }
+                self.next_pattern_args = { "color": color, "state": True}
                 self.stop = True
                 return
             return
