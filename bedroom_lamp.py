@@ -44,35 +44,9 @@ class PatternSolid(Pattern):
     def __init__(self, lamp):
         Pattern.__init__(self, lamp)
         self.name = "solid"
-        self.color = (255, 255, 245)
 
     def run(self):
-        self.set_color(self.color)
-        while not self.lamp.should_exit():
-            sleep(.03)
-
-class PatternDaytime(Pattern):
-
-    def __init__(self, lamp):
-        Pattern.__init__(self, lamp)
-        self.name = "daytime"
-        self.color = (255, 128, 128)
-
-    def run(self):
-        self.set_color(self.color)
-        while not self.lamp.should_exit():
-            sleep(.03)
-
-
-class PatternBedtime(Pattern):
-
-    def __init__(self, lamp):
-        Pattern.__init__(self, lamp)
-        self.name = "nighttime"
-        self.color = (255, 5, 0)
-
-    def run(self):
-        self.set_color(self.color)
+        self.set_color(self.lamp.solid_color)
         while not self.lamp.should_exit():
             sleep(.03)
 
@@ -121,11 +95,11 @@ class BedroomLamp:
             for i in range(NUM_LEDS):
                 self.np[i] = (214, 95, 4)
             self.np.write()
-            sleep(.15)
+            sleep(.1)
             for i in range(NUM_LEDS-1):
                 self.np[i] = (83, 4, 186)
             self.np.write()
-            sleep(.15)
+            sleep(.1)
         self.set_all((8, 0, 0))
 
     def connect_wifi(self):
@@ -161,8 +135,7 @@ class BedroomLamp:
 
         self.next_ping_time = time() + 500
 
-        self.patterns = { "daytime": PatternDaytime , 
-                          "bedtime": PatternBedtime }
+        self.patterns = { "solid": PatternSolid }
         while True:
 
             if self.current_pattern:
@@ -180,10 +153,11 @@ class BedroomLamp:
 
             # Shall we turn on?
             if not self.state and self.next_pattern_args["state"]:
-                self.current_pattern = self.patterns[self.next_pattern_args["effect"]](self)
                 self.brightness = self.next_pattern_args["brightness"]
                 if "color" in self.next_pattern_args:
                     self.solid_color = self.next_pattern_args["color"]
+
+                self.current_pattern = self.patterns[self.next_pattern_args["effect"]](self)
                 self.state = True
             # Turn off?
             elif self.state and not self.next_pattern_args["state"]:
@@ -194,16 +168,14 @@ class BedroomLamp:
             elif self.state and "effect" in self.next_pattern_args and \
                 self.next_pattern_args["state"] and \
                 self.current_pattern.name != self.next_pattern_args["effect"]:
-
-                self.current_pattern = self.patterns[self.next_pattern_args["effect"]](self)
-                self.brightness = self.next_pattern_args["brightness"]
                 try:
                     self.solid_color = self.next_pattern_args["color"]
                 except KeyError:
                     pass
+                self.current_pattern = self.patterns[self.next_pattern_args["effect"]](self)
+                self.brightness = self.next_pattern_args["brightness"]
             # Keep pattern, update params
             else:
-                print("adj", self.next_pattern_args)
                 if "brightness" in self.next_pattern_args:
                     self.brightness = self.next_pattern_args["brightness"]
                 if "color" in self.next_pattern_args:
@@ -238,12 +210,20 @@ class BedroomLamp:
             except ValueError:
                 return
         else:
+            if not self.state:
+                return
             if topic.endswith("brightness"):
-                step = 5 if self.brightness > 10 else 1
-                if msg == "up":
-                    brightness = min(100, self.brightness + step)
-                elif msg == "down":
-                    brightness = max(1, self.brightness - step)
+                if msg in ("up", "down"):
+                    steps = [1, 3, 5, 10, 20, 40, 60, 80, 100]
+                    for i, b in enumerate(steps):
+                        if b >= self.brightness:
+                            index = i
+                            break
+                    if msg == "down":
+                        index = max(index-1, 0)
+                    else:
+                        index = min(index+1, len(steps)-1) 
+                    brightness = steps[index]
                 else:
                     try:
                         brightness = int(msg)
@@ -258,20 +238,21 @@ class BedroomLamp:
                 if msg in ("up", "down"):
                     h,s,v = c_rgb_to_hsv(self.solid_color)
                     if msg == "up":
-                        h = min(255, h + HUE_STEP)
+                        h = (h + HUE_STEP) % 255
                     else:
-                        h = max(0, h - HUE_STEP)
+                        h = (h - HUE_STEP + 255) % 255
                     color = c_hsv_to_rgb((h,s,v))
                 else:
                     color = self.hex_to_rgb(msg[1:])
                     for i in range(3):
                         if color[0] < 0 or color[0] > 255:
                             return
-                
+               
                 self.next_pattern_args = { "color": color, "state": True}
                 self.stop = True
                 return
             return
+
 
         try:
             state = args["state"]
@@ -298,12 +279,12 @@ class BedroomLamp:
         if args["state"] and effect not in self.patterns:
             return
 
-        if args["state"] and self.state and args["effect"] == self.current_pattern.name:
-            self.brightness = args["brightness"]
-            return
-
         self.stop = True
         self.next_pattern_args = args
 
-bedroom_light = BedroomLamp()
-bedroom_light.run()
+while True:
+    try:
+        bedroom_light = BedroomLamp()
+        bedroom_light.run()
+    except Exception as err:
+        print(err)
