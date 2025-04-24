@@ -14,7 +14,7 @@ from _colorsys import c_hsv_to_rgb, c_rgb_to_hsv
 SSID = 'Hippo Oasis'
 PASSWORD = 'chillwithhippos'
 
-MAX_BRIGHTNESS = 50
+MAX_BRIGHTNESS = 62
 NUM_LEDS = 288 
 HUE_STEP = 10
 
