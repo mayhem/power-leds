@@ -15,7 +15,7 @@ SSID = 'Hippo Oasis'
 PASSWORD = 'chillwithhippos'
 
 MAX_BRIGHTNESS = 50
-NUM_LEDS = 159
+NUM_LEDS = 288 
 HUE_STEP = 10
 
 USE_NETWORK = True
@@ -25,42 +25,67 @@ CLIENT_ID = ubinascii.hexlify(unique_id())
 
 class Pattern:
 
-    def __init__(self):
+    def __init__(self, lamp):
         self.name = None
+        self.lamp = lamp
 
-    def run(bower_lamp):
+    def set_color(self, color):
+        leds = [ [0,0,0] for n in range(NUM_LEDS) ]
+        for led in range(NUM_LEDS):
+            leds[led] = color
+        self.lamp.set_leds(leds)
+
+    def run(self):
         pass
 
 
-class PatternSolid:
+class PatternSolid(Pattern):
 
-    def __init__(self):
+    def __init__(self, lamp):
+        Pattern.__init__(self, lamp)
         self.name = "solid"
+        self.color = (255, 255, 245)
 
-    def run(self, lamp):
-        print("run: bri %d rgb: (%d,%d,%d) eff: %s" % (lamp.brightness,
-                                                       lamp.solid_color[0],
-                                                       lamp.solid_color[1],
-                                                       lamp.solid_color[2],
-                                                       lamp.current_pattern.name))
-        leds = [ [0,0,0] for n in range(NUM_LEDS) ]
-        for led in range(NUM_LEDS):
-            leds[led] = lamp.solid_color
-            
-        lamp.set_leds(leds)
-        while not lamp.should_exit():
+    def run(self):
+        self.set_color(self.color)
+        while not self.lamp.should_exit():
+            sleep(.03)
+
+class PatternDaytime(Pattern):
+
+    def __init__(self, lamp):
+        Pattern.__init__(self, lamp)
+        self.name = "daytime"
+        self.color = (255, 128, 128)
+
+    def run(self):
+        self.set_color(self.color)
+        while not self.lamp.should_exit():
             sleep(.03)
 
 
-bower_light = None
+class PatternBedtime(Pattern):
+
+    def __init__(self, lamp):
+        Pattern.__init__(self, lamp)
+        self.name = "nighttime"
+        self.color = (255, 5, 0)
+
+    def run(self):
+        self.set_color(self.color)
+        while not self.lamp.should_exit():
+            sleep(.03)
+
+
+bedroom_light = None
 def callback(topic, msg):
-    global bower_light
+    global bedroom_light
     try:
-        bower_light.callback(str(topic, "utf-8"), str(msg, "utf-8"))
+        bedroom_light.callback(str(topic, "utf-8"), str(msg, "utf-8"))
     except Exception as err:
         print(err)
 
-class BowerLamp:
+class BedroomLamp:
     def __init__(self):
         pin = Pin(1, Pin.OUT)
         self.np = NeoPixel(pin, NUM_LEDS)
@@ -79,14 +104,14 @@ class BowerLamp:
             self.c = MQTTClient(CLIENT_ID, MQTT_SERVER, MQTT_PORT)
             self.c.set_callback(callback)
             self.c.connect()
-            self.c.subscribe("bower-light/set")
-            self.c.subscribe("bower-light/color")
-            self.c.subscribe("bower-light/brightness")
+            self.c.subscribe("mood-light/set")
+            self.c.subscribe("mood-light/color")
+            self.c.subscribe("mood-light/brightness")
             self.next_ping_time = None
         else:
             self.c = None
 
-        #self.wdt = WDT()
+#        self.wdt = WDT()
 
         print("Start lamp!")
         self.set_all()
@@ -131,17 +156,17 @@ class BowerLamp:
 
     def run(self):
         if not USE_NETWORK:
-            p = PatternHipposAndDamselsFade()
-            p.run(self)
+            p = PatternSolid()
+            p.run()
 
         self.next_ping_time = time() + 500
 
-        self.patterns = { "daytime": PatternSolid , 
-                          "bedtime": PatternSolid }
+        self.patterns = { "daytime": PatternDaytime , 
+                          "bedtime": PatternBedtime }
         while True:
 
             if self.current_pattern:
-                self.current_pattern.run(self)
+                self.current_pattern.run()
             else:
                 # Loop until we're told to exit, which means something is about to happen
                 while not self.should_exit():
@@ -155,15 +180,13 @@ class BowerLamp:
 
             # Shall we turn on?
             if not self.state and self.next_pattern_args["state"]:
-                print("turn on")
-                self.current_pattern = self.patterns[self.next_pattern_args["effect"]]()
+                self.current_pattern = self.patterns[self.next_pattern_args["effect"]](self)
                 self.brightness = self.next_pattern_args["brightness"]
                 if "color" in self.next_pattern_args:
                     self.solid_color = self.next_pattern_args["color"]
                 self.state = True
             # Turn off?
             elif self.state and not self.next_pattern_args["state"]:
-                print("turn off")
                 self.current_pattern = None
                 self.state = False
                 self.set_all()
@@ -171,11 +194,13 @@ class BowerLamp:
             elif self.state and "effect" in self.next_pattern_args and \
                 self.next_pattern_args["state"] and \
                 self.current_pattern.name != self.next_pattern_args["effect"]:
-                print("next patt")
 
-                self.current_pattern = self.patterns[self.next_pattern_args["effect"]]()
+                self.current_pattern = self.patterns[self.next_pattern_args["effect"]](self)
                 self.brightness = self.next_pattern_args["brightness"]
-                self.solid_color = self.next_pattern_args["color"]
+                try:
+                    self.solid_color = self.next_pattern_args["color"]
+                except KeyError:
+                    pass
             # Keep pattern, update params
             else:
                 print("adj", self.next_pattern_args)
@@ -195,7 +220,7 @@ class BowerLamp:
                 self.next_ping_time = time() + 500
                 self.c.ping()
 
-        #self.wdt.feed()
+#        self.wdt.feed()
 
         return self.stop
     
@@ -280,5 +305,5 @@ class BowerLamp:
         self.stop = True
         self.next_pattern_args = args
 
-bower_light = BowerLamp()
-bower_light.run()
+bedroom_light = BedroomLamp()
+bedroom_light.run()
